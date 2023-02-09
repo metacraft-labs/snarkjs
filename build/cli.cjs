@@ -13,6 +13,7 @@ var crypto = require('crypto');
 var path = require('path');
 var binFileUtils = require('@iden3/binfileutils');
 var ejs = require('ejs');
+var console$1 = require('console');
 var circom_runtime = require('circom_runtime');
 var jsSha3 = require('js-sha3');
 var bfj = require('bfj');
@@ -5676,6 +5677,27 @@ async function read(fileName) {
     return res;
 }
 
+async function readNNumbers(fileName, n) {
+
+    const {fd, sections} = await binFileUtils__namespace.readBinFile(fileName, "wtns", 2);
+
+    const {n8, nWitness} = await readHeader(fd, sections);
+
+    console$1.assert(nWitness >= n);
+
+    await binFileUtils__namespace.startReadUniqueSection(fd, sections, 2);
+    const res = [];
+    for (let i=0; i<n; i++) {
+        const v = await binFileUtils__namespace.readBigInt(fd, n8);
+        res.push(v);
+    }
+    await binFileUtils__namespace.endReadSection(fd, true);
+
+    await fd.close();
+
+    return res;
+}
+
 /*
     Copyright 2018 0KIMS association.
 
@@ -6071,7 +6093,7 @@ async function wtnsCalculate$1(_input, wasmFileName, wtnsFileName, options) {
     const wasm = await fdWasm.read(fdWasm.totalSize);
     await fdWasm.close();
 
-    const wc = await circom_runtime.WitnessCalculatorBuilder(wasm);
+    const wc = await circom_runtime.WitnessCalculatorBuilder(wasm, options);
     if (wc.circom_version() == 1) {
         const w = await wc.calculateBinWitness(input);
 
@@ -12316,32 +12338,6 @@ async function wtnsDebug$1(_input, wasmFileName, wtnsFileName, symName, options,
     along with snarkJS. If not, see <https://www.gnu.org/licenses/>.
 */
 
-async function wtnsExportJson$1(wtnsFileName) {
-
-    const w = await read(wtnsFileName);
-
-    return w;
-}
-
-/*
-    Copyright 2018 0KIMS association.
-
-    This file is part of snarkJS.
-
-    snarkJS is a free software: you can redistribute it and/or modify it
-    under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    snarkJS is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public
-    License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with snarkJS. If not, see <https://www.gnu.org/licenses/>.
-*/
-
 async function wtnsCheck$1(r1csFilename, wtnsFilename, logger) {
 
     if (logger) logger.info("WITNESS CHECKING STARTED");
@@ -12466,6 +12462,39 @@ async function wtnsCheck$1(r1csFilename, wtnsFilename, logger) {
     function getWitnessValue(signalId) {
         return Fr.fromRprLE(buffWitness.slice(signalId * sFr, signalId * sFr + sFr));
     }
+}
+
+/*
+    Copyright 2018 0KIMS association.
+
+    This file is part of snarkJS.
+
+    snarkJS is a free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    snarkJS is distributed in the hope that it will be useful, but WITHOUT
+    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public
+    License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with snarkJS. If not, see <https://www.gnu.org/licenses/>.
+*/
+
+async function wtnsExportJson$1(wtnsFileName) {
+
+    const w = await read(wtnsFileName);
+
+    return w;
+}
+
+async function wtnsNExportJson$1(wtnsFileName, n) {
+
+    const w = await readNNumbers(wtnsFileName, n);
+
+    return w;
 }
 
 /*
@@ -12620,6 +12649,14 @@ const commands = [
         description: "Check if a specific witness of a circuit fullfills the r1cs constraints",
         alias: ["wchk"],
         action: wtnsCheck
+    },
+    {
+        cmd: "wtns export json [numbersToRead] [witness.wtns] [witnes.json]",
+        description: "Calculate the first N numbers of the witness with debug info.",
+        longDescription: "Calculate the first N numbers of the witness with debug info. \nOptions:\n-g or --g : Log signal gets\n-s or --s : Log signal sets\n-t or --trigger : Log triggers ",
+        options: "-verbose|v",
+        alias: ["wejN"],
+        action: wtnsNExportJson
     },
     {
         cmd: "zkey contribute <circuit_old.zkey> <circuit_new.zkey>",
@@ -12881,7 +12918,7 @@ async function wtnsCalculate(params, options) {
 
     const input = JSON.parse(await fs__default["default"].promises.readFile(inputName, "utf8"));
 
-    await wtnsCalculate$1(input, wasmName, witnessName);
+    await wtnsCalculate$1(input, wasmName, witnessName, {});
 
     return 0;
 }
@@ -12920,8 +12957,6 @@ async function wtnsExportJson(params, options) {
     return 0;
 }
 
-// wtns export json  [witness.wtns] [witness.json]
-// -get|g -set|s -trigger|t
 async function wtnsCheck(params, options) {
     const r1csFilename = params[0] || "circuit.r1cs";
     const wtnsFilename = params[1] || "witness.wtns";
@@ -12937,6 +12972,21 @@ async function wtnsCheck(params, options) {
     }
 }
 
+// wtns export json  [witness.wtns] [witness.json]
+// -get|g -set|s -trigger|t
+async function wtnsNExportJson(params, options) {
+    const firstNNumbers = params[0] || "0";
+    const wtnsName = params[1] || "witness.wtns";
+    const jsonName = params[2] || "witness.json";
+
+    if (options.verbose) Logger__default["default"].setLogLevel("DEBUG");
+
+    const w = await wtnsNExportJson$1(wtnsName, firstNNumbers);
+
+    await bfj__default["default"].write(jsonName, stringifyBigInts(w), { space: 1 });
+
+    return 0;
+}
 
 /*
 // zksnark setup [circuit.r1cs] [circuit.zkey] [verification_key.json]

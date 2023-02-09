@@ -17,11 +17,18 @@
     along with snarkJS. If not, see <https://www.gnu.org/licenses/>.
 */
 
-import {read} from "./wtns_utils.js";
+import {read, readNNumbers} from "./wtns_utils.js";
 
 export default async function wtnsExportJson(wtnsFileName) {
 
     const w = await read(wtnsFileName);
+
+    return w;
+}
+
+export async function wtnsNExportJson(wtnsFileName, n) {
+
+    const w = await readNNumbers(wtnsFileName, n);
 
     return w;
 }

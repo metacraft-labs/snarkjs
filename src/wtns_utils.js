@@ -20,6 +20,7 @@
 import { Scalar } from "ffjavascript";
 
 import * as binFileUtils from "@iden3/binfileutils";
+import { assert } from "console";
 
 
 export async function write(fd, witness, prime) {
@@ -90,3 +91,23 @@ export async function read(fileName) {
     return res;
 }
 
+export async function readNNumbers(fileName, n) {
+
+    const {fd, sections} = await binFileUtils.readBinFile(fileName, "wtns", 2);
+
+    const {n8, nWitness} = await readHeader(fd, sections);
+
+    assert(nWitness >= n)
+
+    await binFileUtils.startReadUniqueSection(fd, sections, 2);
+    const res = [];
+    for (let i=0; i<n; i++) {
+        const v = await binFileUtils.readBigInt(fd, n8);
+        res.push(v);
+    }
+    await binFileUtils.endReadSection(fd, true);
+
+    await fd.close();
+
+    return res;
+}

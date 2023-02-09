@@ -180,6 +180,14 @@ const commands = [
         action: wtnsCheck
     },
     {
+        cmd: "wtns export json [numbersToRead] [witness.wtns] [witnes.json]",
+        description: "Calculate the first N numbers of the witness with debug info.",
+        longDescription: "Calculate the first N numbers of the witness with debug info. \nOptions:\n-g or --g : Log signal gets\n-s or --s : Log signal sets\n-t or --trigger : Log triggers ",
+        options: "-verbose|v",
+        alias: ["wejN"],
+        action: wtnsNExportJson
+    },
+    {
         cmd: "zkey contribute <circuit_old.zkey> <circuit_new.zkey>",
         description: "creates a zkey file with a new contribution",
         alias: ["zkc"],
@@ -478,8 +486,6 @@ async function wtnsExportJson(params, options) {
     return 0;
 }
 
-// wtns export json  [witness.wtns] [witness.json]
-// -get|g -set|s -trigger|t
 async function wtnsCheck(params, options) {
     const r1csFilename = params[0] || "circuit.r1cs";
     const wtnsFilename = params[1] || "witness.wtns";
@@ -495,6 +501,21 @@ async function wtnsCheck(params, options) {
     }
 }
 
+// wtns export json  [witness.wtns] [witness.json]
+// -get|g -set|s -trigger|t
+async function wtnsNExportJson(params, options) {
+    const firstNNumbers = params[0] || "0";
+    const wtnsName = params[1] || "witness.wtns";
+    const jsonName = params[2] || "witness.json";
+
+    if (options.verbose) Logger.setLogLevel("DEBUG");
+
+    const w = await wtns.exportJsonWithNNumbers(wtnsName, firstNNumbers);
+
+    await bfj.write(jsonName, stringifyBigInts(w), { space: 1 });
+
+    return 0;
+}
 
 /*
 // zksnark setup [circuit.r1cs] [circuit.zkey] [verification_key.json]

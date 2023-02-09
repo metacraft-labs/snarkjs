@@ -1,4 +1,5 @@
 import { Scalar, BigBuffer, buildBn128, buildBls12381, ChaCha, F1Field, utils, getCurveFromR as getCurveFromR$1 } from 'ffjavascript';
+import { assert as assert$2 } from 'console';
 
 var fs = {};
 
@@ -872,8 +873,8 @@ class BigMemFile {
     }
 }
 
-const O_TRUNC = 1024;
-const O_CREAT = 512;
+const O_TRUNC = 512;
+const O_CREAT = 64;
 const O_RDWR = 2;
 const O_RDONLY = 0;
 
@@ -1130,6 +1131,13 @@ async function getCurveFromName(name) {
     }
 
 }
+
+var curves = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    getCurveFromR: getCurveFromR,
+    getCurveFromQ: getCurveFromQ,
+    getCurveFromName: getCurveFromName
+});
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -2928,6 +2936,27 @@ async function read(fileName) {
     return res;
 }
 
+async function readNNumbers(fileName, n) {
+
+    const {fd, sections} = await readBinFile(fileName, "wtns", 2);
+
+    const {n8, nWitness} = await readHeader(fd, sections);
+
+    assert$2(nWitness >= n);
+
+    await startReadUniqueSection(fd, sections, 2);
+    const res = [];
+    for (let i=0; i<n; i++) {
+        const v = await readBigInt(fd, n8);
+        res.push(v);
+    }
+    await endReadSection(fd, true);
+
+    await fd.close();
+
+    return res;
+}
+
 /*
     Copyright 2018 0KIMS association.
 
@@ -3916,7 +3945,7 @@ async function wtnsCalculate(_input, wasmFileName, wtnsFileName, options) {
     const wasm = await fdWasm.read(fdWasm.totalSize);
     await fdWasm.close();
 
-    const wc = await builder(wasm);
+    const wc = await builder(wasm, options);
     if (wc.circom_version() == 1) {
         const w = await wc.calculateBinWitness(input);
 
@@ -7081,32 +7110,6 @@ async function wtnsDebug(_input, wasmFileName, wtnsFileName, symName, options, l
     along with snarkJS. If not, see <https://www.gnu.org/licenses/>.
 */
 
-async function wtnsExportJson(wtnsFileName) {
-
-    const w = await read(wtnsFileName);
-
-    return w;
-}
-
-/*
-    Copyright 2018 0KIMS association.
-
-    This file is part of snarkJS.
-
-    snarkJS is a free software: you can redistribute it and/or modify it
-    under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    snarkJS is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public
-    License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with snarkJS. If not, see <https://www.gnu.org/licenses/>.
-*/
-
 async function wtnsCheck(r1csFilename, wtnsFilename, logger) {
 
     if (logger) logger.info("WITNESS CHECKING STARTED");
@@ -7252,12 +7255,46 @@ async function wtnsCheck(r1csFilename, wtnsFilename, logger) {
     along with snarkJS. If not, see <https://www.gnu.org/licenses/>.
 */
 
+async function wtnsExportJson(wtnsFileName) {
+
+    const w = await read(wtnsFileName);
+
+    return w;
+}
+
+async function wtnsNExportJson(wtnsFileName, n) {
+
+    const w = await readNNumbers(wtnsFileName, n);
+
+    return w;
+}
+
+/*
+    Copyright 2018 0KIMS association.
+
+    This file is part of snarkJS.
+
+    snarkJS is a free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    snarkJS is distributed in the hope that it will be useful, but WITHOUT
+    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public
+    License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with snarkJS. If not, see <https://www.gnu.org/licenses/>.
+*/
+
 var wtns = /*#__PURE__*/Object.freeze({
     __proto__: null,
     calculate: wtnsCalculate,
     debug: wtnsDebug,
+    check: wtnsCheck,
     exportJson: wtnsExportJson,
-    check: wtnsCheck
+    exportJsonWithNNumbers: wtnsNExportJson
 });
 
 /*
@@ -16057,4 +16094,4 @@ var fflonk = /*#__PURE__*/Object.freeze({
     exportSolidityCallData: fflonkExportCallData
 });
 
-export { fflonk, groth16, plonk, powersoftau as powersOfTau, r1cs, wtns, zkey as zKey };
+export { curves, fflonk, groth16, plonk, powersoftau as powersOfTau, r1cs, wtns, zkey as zKey };
