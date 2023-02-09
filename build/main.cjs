@@ -7,6 +7,7 @@ var ffjavascript = require('ffjavascript');
 var Blake2b = require('blake2b-wasm');
 var readline = require('readline');
 var crypto = require('crypto');
+var console$1 = require('console');
 var fastFile = require('fastfile');
 var circom_runtime = require('circom_runtime');
 var r1csfile = require('r1csfile');
@@ -793,6 +794,27 @@ async function read(fileName) {
         res.push(v);
     }
     await binFileUtils__namespace.endReadSection(fd);
+
+    await fd.close();
+
+    return res;
+}
+
+async function readNNumbers(fileName, n) {
+
+    const {fd, sections} = await binFileUtils__namespace.readBinFile(fileName, "wtns", 2);
+
+    const {n8, nWitness} = await readHeader(fd, sections);
+
+    console$1.assert(nWitness >= n);
+
+    await binFileUtils__namespace.startReadUniqueSection(fd, sections, 2);
+    const res = [];
+    for (let i=0; i<n; i++) {
+        const v = await binFileUtils__namespace.readBigInt(fd, n8);
+        res.push(v);
+    }
+    await binFileUtils__namespace.endReadSection(fd, true);
 
     await fd.close();
 
@@ -3990,6 +4012,13 @@ async function wtnsExportJson(wtnsFileName) {
     return w;
 }
 
+async function wtnsNExportJson(wtnsFileName, n) {
+
+    const w = await readNNumbers(wtnsFileName, n);
+
+    return w;
+}
+
 /*
     Copyright 2018 0KIMS association.
 
@@ -4013,7 +4042,8 @@ var wtns = /*#__PURE__*/Object.freeze({
     __proto__: null,
     calculate: wtnsCalculate,
     debug: wtnsDebug,
-    exportJson: wtnsExportJson
+    exportJson: wtnsExportJson,
+    exportJsonWithNNumbers: wtnsNExportJson
 });
 
 /*

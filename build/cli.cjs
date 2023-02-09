@@ -14,6 +14,7 @@ var path = require('path');
 var binFileUtils = require('@iden3/binfileutils');
 var ejs = require('ejs');
 var bfj = require('bfj');
+var console$1 = require('console');
 var jsSha3 = require('js-sha3');
 var circom_runtime = require('circom_runtime');
 var Logger = require('logplease');
@@ -7398,6 +7399,27 @@ async function read(fileName) {
     return res;
 }
 
+async function readNNumbers(fileName, n) {
+
+    const {fd, sections} = await binFileUtils__namespace.readBinFile(fileName, "wtns", 2);
+
+    const {n8, nWitness} = await readHeader(fd, sections);
+
+    console$1.assert(nWitness >= n);
+
+    await binFileUtils__namespace.startReadUniqueSection(fd, sections, 2);
+    const res = [];
+    for (let i=0; i<n; i++) {
+        const v = await binFileUtils__namespace.readBigInt(fd, n8);
+        res.push(v);
+    }
+    await binFileUtils__namespace.endReadSection(fd, true);
+
+    await fd.close();
+
+    return res;
+}
+
 /*
     Copyright 2022 iden3 association.
 
@@ -12314,6 +12336,13 @@ async function wtnsExportJson$1(wtnsFileName) {
     return w;
 }
 
+async function wtnsNExportJson$1(wtnsFileName, n) {
+
+    const w = await readNNumbers(wtnsFileName, n);
+
+    return w;
+}
+
 /*
     Copyright 2018 0KIMS association.
 
@@ -12460,6 +12489,14 @@ const commands = [
         options: "-verbose|v",
         alias: ["wej"],
         action: wtnsExportJson
+    },
+    {
+        cmd: "wtns export json [numbersToRead] [witness.wtns] [witnes.json]",
+        description: "Calculate the first N numbers of the witness with debug info.",
+        longDescription: "Calculate the first N numbers of the witness with debug info. \nOptions:\n-g or --g : Log signal gets\n-s or --s : Log signal sets\n-t or --trigger : Log triggers ",
+        options: "-verbose|v",
+        alias: ["wejN"],
+        action: wtnsNExportJson
     },
     {
         cmd: "zkey contribute <circuit_old.zkey> <circuit_new.zkey>",
@@ -12760,6 +12797,21 @@ async function wtnsExportJson(params, options) {
     return 0;
 }
 
+// wtns export json  [witness.wtns] [witness.json]
+// -get|g -set|s -trigger|t
+async function wtnsNExportJson(params, options) {
+    const firstNNumbers = params[0] || "0";
+    const wtnsName = params[1] || "witness.wtns";
+    const jsonName = params[2] || "witness.json";
+
+    if (options.verbose) Logger__default["default"].setLogLevel("DEBUG");
+
+    const w = await wtnsNExportJson$1(wtnsName, firstNNumbers);
+
+    await bfj__default["default"].write(jsonName, stringifyBigInts(w), { space: 1 });
+
+    return 0;
+}
 
 /*
 // zksnark setup [circuit.r1cs] [circuit.zkey] [verification_key.json]
